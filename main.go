@@ -12,7 +12,8 @@ import (
     "github.com/golang/protobuf/proto"
     "bytes"
     "msgClient"
-    "logic"
+  _ "logic"
+    "router"
 )
  
 var (
@@ -47,8 +48,9 @@ func handleConn(conn net.Conn){
             newData := &msgClient.Register{}
             proto.Unmarshal(protoData, newData)
             fmt.Printf("package length %d byte, name:%s, method:%s\n", x, newData.GetUsername(),newData.GetMethod());
-            
-            logic.(newData.GetMethod())(newData)
+            //logicFuncName := newData.GetMethod()
+            //logic.logicFuncName(newData)
+            router.CallLogicFunc("Register")
     }   
 
 }

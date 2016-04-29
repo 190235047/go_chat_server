@@ -3,7 +3,12 @@ package logic
 import(
     "msgClient"
     "fmt"
+    "router"
 )
+
+type User struct {
+        router.Router
+}
 
 type userNode struct{
         uid int64
@@ -35,8 +40,20 @@ var mapFunc = map[string]functionRegisterType {
                  "register" : register,
                 }
 */
+
+func init(){
+        router.Register(User{})
+}
+
 func Register(clientData *msgClient.Register) bool{
         fmt.Printf("register : %s\n",clientData.GetUsername())
         return true
 }
 
+func (this *User) Register() {
+        fmt.Printf("register : %s\n","sadddee")
+}
+func (this *User)Test(){
+
+        fmt.Printf("sasas")
+}
