@@ -54,5 +54,5 @@ func (this *User) Register() {
 }
 func (this *User)Test(){
 
-        fmt.Printf("sasas")
+        fmt.Printf("sasas :")
 }

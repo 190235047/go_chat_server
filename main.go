@@ -29,6 +29,7 @@ var (
 
 
 func handleConn(conn net.Conn){
+    fmt.Println("new conn")
     for {
             headBuff := make([]byte, 2)
             var headNum int
@@ -51,6 +52,9 @@ func handleConn(conn net.Conn){
             //logicFuncName := newData.GetMethod()
             //logic.logicFuncName(newData)
             router.CallLogicFunc(newData.GetModel(),newData.GetAction(),newData.GetContent())
+            if (!newData.GetIsKeep()) {
+                break
+            }
     }   
 
 }
