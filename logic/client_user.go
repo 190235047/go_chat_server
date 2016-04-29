@@ -40,7 +40,7 @@ type userList struct{
 type roomNode struct{
         roomid int64
         userList *userList
-	tail *userList
+	userTail *userList
         next *roomNode
 }
 
@@ -157,12 +157,16 @@ func (room *roomNode) addUser(uid int64, my RegisterJson) {
 	if !user.userIsInRoom(my.Roomid) {
 		return
 	}
-	if room.tail == nil {
-		room.tail = new(userList)
-		room.userList = room.tail
+	if room.userTail == nil {
+		room.userTail = new(userList)
+		room.userList = room.userTail
+                room.userTail.uid = uid
+                return
 	}
-	
-	
+        newUser = new(userList)
+        newUser.uid = uid
+        room.tail,next = newUser
+	return
 }
 
 func (this *RegisterJson) addRoom(){
@@ -202,6 +206,9 @@ func (this *User) Register() {
 	fmt.Printf("register : %s\n",this.Content)
 	f := []byte("asas")
 	this.Conn.Write(f)
+        jsonData.addRomm() 
+        //必须在addUser的上面 因为在addRoom里面加入uid得去user数组链表查看
+        //这个user有没有包含这个房间 如果没有那么说明这个服务器上这个房间没有注册这个uid
 	jsonData.addUser(this.Conn)
 }
 func (this *User)Test(){
