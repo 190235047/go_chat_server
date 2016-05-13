@@ -2,35 +2,29 @@ package mynet
  
 import (
     "errors"
-    "fmt"
+    //"fmt"
     "log"
     "net"
-    //"sync"
-    //"time"
-    "encoding/binary"
-    "bytes"
-    "github.com/golang/protobuf/proto"
-    "msgClient"
 )
- 
-func handleConn(conn net.Conn) {
+
+func handleClose(conn net.Conn) {
+	conn.Close()
+}
+
+type callFuncType func(net.Conn)
+var handleFuncMap = make(map[string]callFuncType)
+
+func HandleFuc(funcName string, callFuncName callFuncType) {
+	handleFuncMap[funcName] = callFuncName
+}
+
+func handleConn(conn net.Conn, callFuncName callFuncType) {
     defer conn.Close();
-    headBuff := make([]byte, 2)
-    var headNum int
-    conn.Read(headBuff[headNum:])
-    b_buf := bytes.NewBuffer(headBuff)  
-    var x int16 
-    binary.Read(b_buf, binary.BigEndian, &x)
-    protoData := make([]byte, x);
-    var bodyNum int
-    conn.Read(protoData[bodyNum:])
-    newData := &msgClient.Register{}
-    proto.Unmarshal(protoData, newData)
-    fmt.Printf("package length %d byte, name:%s, method:%s", x, newData.GetUsername(),newData.GetMethod());
+    callFuncName(conn)
 }
  
 //start listens
-func StartListen(addr string) error {
+func StartListen(addr string, callFuncName callFuncType) error {
     listener, err := net.Listen("tcp", addr)
     if err != nil {
         return err
@@ -42,7 +36,7 @@ func StartListen(addr string) error {
             log.Printf("number:%d,failed listening:%v\n", failures, listenErr)
             failures++
         }
-        go handleConn(conn);
+        go handleConn(conn, callFuncName);
     }
     return errors.New("Too many listener.Accept() errors,listener stop")
 }
