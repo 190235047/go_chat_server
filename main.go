@@ -14,6 +14,7 @@ import (
     "msgClient"
   _ "logic"
     "router"
+    "myproto"
 )
  
 var (
@@ -45,12 +46,12 @@ func handleConn(conn net.Conn){
             if (err != nil) {
                 break
             }
-            newData := &msgClient.Register{}
+            newData := &myproto.Client{}
             proto.Unmarshal(protoData, newData)
-            fmt.Printf("package length %d byte, name:%s, method:%s\n", x, newData.GetUsername(),newData.GetMethod());
+            fmt.Printf("package length %d byte, mod:%s, action:%s\n", x, newData.GetModel(),newData.GetAction());
             //logicFuncName := newData.GetMethod()
             //logic.logicFuncName(newData)
-            router.CallLogicFunc("Register")
+            router.CallLogicFunc(newData.GetModel(),newData.GetAction())
     }   
 
 }

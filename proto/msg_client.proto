@@ -1,9 +1,0 @@
-package msgClient;
-
-message Register {
-required int64 uid = 1;
-required string username = 2 ;
-required int64 roomid = 3;
-required string method = 4;
-}
-
