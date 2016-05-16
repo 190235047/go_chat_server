@@ -6,24 +6,34 @@ import(
 )
 
 type Router struct {
-        method string
-        action string
+        //model string
+        //action string
+	//Content string
 }
 
 var logicMap = map[string]reflect.Value{}
 
-func Register(action interface{}){
-        fmt.Printf("action type :%s", reflect.TypeOf(action).Name())
-        logicMap[reflect.TypeOf(action).Name()] = reflect.ValueOf(action)
-        //logicMap["User"].MethodByName("Test").Call(nil) 
-        // []reflect.Value{}
-        fmt.Println(logicMap["User"])
+func Register(model interface{}){
+        //fmt.Printf("action type :%s", reflect.TypeOf(model).Name())
+        logicMap[reflect.TypeOf(model).Name()] = reflect.ValueOf(model)
+        //logicMap["User"].MethodByName("Test").Call([]reflect.Value{}) 
+        //fmt.Println(logicMap["User"])
 }
 
-func CallLogicFunc(modelName string, funcName string) {
-        //fmt.Println(logicMap["User"])
-        //logicMap["User"].MethodByName(funcName).Call([]reflect.Value{})
+func CallLogicFunc(modelName string, funcName string, content string) {
+        //fmt.Println(logicMap)
         callReflectType := logicMap[modelName].Type()
         call := reflect.New(callReflectType).Elem();
-        call.MethodByName(funcName).Call([]reflect.Value{})
+	//call.FieldByName("Content").SetString(content)
+	fmt.Println("call=", call, ", address=", &call, ",type=", reflect.TypeOf(call), ",func=", funcName, ",fnObj=",call.MethodByName(funcName))
+	fmt.Printf("call addr : %d", &call)
+//	call.MethodByName(funcName).Call([]reflect.Value{})
+
+	if call.CanAddr() && call.Kind() != reflect.Ptr{
+		call = call.Addr()
+	}
+
+	if fn := call.MethodByName(funcName); fn.IsValid(){
+		fn.Call([]reflect.Value{})
+	}
 }

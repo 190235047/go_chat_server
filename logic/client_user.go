@@ -1,7 +1,6 @@
 package logic
 
 import(
-    "msgClient"
     "fmt"
     "router"
 )
@@ -45,8 +44,8 @@ func init(){
         router.Register(User{})
 }
 
-func Register(clientData *msgClient.Register) bool{
-        fmt.Printf("register : %s\n",clientData.GetUsername())
+func Register() bool{
+        fmt.Printf("register : %s\n", "asdasd")
         return true
 }
 

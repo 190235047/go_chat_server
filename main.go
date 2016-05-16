@@ -11,7 +11,6 @@ import (
     "encoding/binary"
     "github.com/golang/protobuf/proto"
     "bytes"
-    "msgClient"
   _ "logic"
     "router"
     "myproto"
@@ -51,7 +50,7 @@ func handleConn(conn net.Conn){
             fmt.Printf("package length %d byte, mod:%s, action:%s\n", x, newData.GetModel(),newData.GetAction());
             //logicFuncName := newData.GetMethod()
             //logic.logicFuncName(newData)
-            router.CallLogicFunc(newData.GetModel(),newData.GetAction())
+            router.CallLogicFunc(newData.GetModel(),newData.GetAction(),newData.GetContent())
     }   
 
 }
