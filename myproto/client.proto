@@ -1,0 +1,9 @@
+package myproto;
+
+message Client {
+required string model = 1;
+required string action = 2;
+required bool isKeep = 3;
+required string content = 4;
+}
+
