@@ -29,30 +29,28 @@ var (
 
 
 func handleConn(conn net.Conn){
-    fmt.Println("new conn")
+    log.Println("net conn")
+    var headNum int
+    var bodyNum int
+    var x int16
     for {
             headBuff := make([]byte, 2)
-            var headNum int
             _, err := conn.Read(headBuff[headNum:])
             if (err != nil) {
                 break
             }
             b_buf := bytes.NewBuffer(headBuff)
-            var x int16
             binary.Read(b_buf, binary.BigEndian, &x)
             protoData := make([]byte, x);
-            var bodyNum int
             _, err =  conn.Read(protoData[bodyNum:])
             if (err != nil) {
                 break
             }
             newData := &myproto.Client{}
             proto.Unmarshal(protoData, newData)
-            fmt.Printf("package length %d byte, mod:%s, action:%s\n", x, newData.GetModel(),newData.GetAction());
-            //logicFuncName := newData.GetMethod()
-            //logic.logicFuncName(newData)
-            router.CallLogicFunc(newData.GetModel(),newData.GetAction(),newData.GetContent())
-            if (!newData.GetIsKeep()) {
+            //fmt.Printf("package length %d byte, mod:%s, action:%s\n", x, newData.GetModel(),newData.GetAction());
+            flag := router.CallLogicFunc(newData.GetModel(),newData.GetAction(),newData.GetContent(), conn)
+            if (!newData.GetIsKeep() || !flag) {
                 break
             }
     }   
