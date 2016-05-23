@@ -50,6 +50,12 @@ type RegisterJson struct{
 	Username string `json:"username"`
 }
 
+type SendMsgJson struct{
+	Roomid int64 `json:"roomid"`
+	Msg sring `json:"msg"`
+	Username string `json:"username"`
+}
+
 const USER_BUCKET_NUM = 1024
 const ROOM_BUCKET_NUM = 1024
 
@@ -76,25 +82,28 @@ func (user *userNode) addConn(conn net.Conn, my RegisterJson) bool{
 		user.roomList.roomid = my.Roomid
 		fmt.Println("new")
 	}
-	roomList := user.roomList
-	for (roomList != nil) {
-		if roomList.roomid == my.Roomid {
-			connlist := roomList.connList
+	rList := user.roomList
+	var connList *userConnList
+	for (rList != nil) {
+		if rList.roomid == my.Roomid {
+			connList = rList.connList
+			fmt.Println("add Conn roomid=", my.Roomid)
 			break;
 		}
-		if roomList.next == nil {
-			roomList.next = new(roomList)
-			roomList.next.roomid = my.Roomid
-			roomList = roomList.next
+		if rList.next == nil {
+			rList.next = new(roomList)
+			rList.next.roomid = my.Roomid
+			rList = rList.next
 			//为什么不在这退出，让它再循环统一交给 roomList.roomid == my.Roomid 判断来退出
 		}	
 	}
 	if connList == nil { //初始化
 		connList = new(userConnList)
+		rList.connList = connList
 	} 
 	for connList != nil {
 		fmt.Println("uid : ", my.Uid)
-		if connlist.conn == conn {
+		if connList.conn == conn {
 			//write error log
 			log.Println("[error] addConn conn equal, uid=" , my.Uid)
 			return false
@@ -114,7 +123,6 @@ func (user *userNode) addConn(conn net.Conn, my RegisterJson) bool{
 
 func (this RegisterJson) addUser(conn net.Conn){
 	num := this.Uid % USER_BUCKET_NUM
-	num = 3  //test test delete
 	if (this.Uid == 0) {
 		return
 	}
@@ -143,33 +151,50 @@ func (user *userNode) userIsInRoom(roomid int64) bool {
 	roomList := user.roomList
 	for roomList != nil {
 		if roomList.roomid == roomid {
+			fmt.Println("kkkkkkkkkkkkkk  roomid=", roomList.roomid)
 			return true
 		}
+		fmt.Println("bbbbbbbbbbb  roomid=", roomList.roomid)
 		roomList = roomList.next
 	}
 	return false
 }
 
-func (room *roomNode) addUser(uid int64, my RegisterJson) {
-	num := uid % USER_BUCKET_NUM
+func (room *roomNode) addUser(my RegisterJson) {
+	num := my.Uid % USER_BUCKET_NUM
 	user := &userArr[num]
 	//如果userNode 的roomList 有当前Roomid说明之前已经添加过当前用户的uid了
 	if !user.userIsInRoom(my.Roomid) {
+		testGetRoomUserList(room.roomid)
 		return
 	}
+	fmt.Println("ewrwer3455 addUser")
 	if room.userTail == nil {
 		room.userTail = new(userList)
 		room.userList = room.userTail
-                room.userTail.uid = uid
+                room.userTail.uid = my.Uid
                 return
 	}
-        newUser = new(userList)
-        newUser.uid = uid
-        room.tail,next = newUser
+	fmt.Println("roomNode  addUser new")
+        newUser := new(userList)
+        newUser.uid = my.Uid
+        room.userTail.next = newUser
 	return
 }
 
-func (this *RegisterJson) addRoom(){
+func testGetRoomUserList(roomid int64) {
+	num  := roomid % ROOM_BUCKET_NUM
+	room := &roomArr[num]
+	if (room == nil) {
+		fmt.Println("no user list, roomid=", roomid)
+	}
+	for (room.userList != nil) {
+		fmt.Println("testGetRoomUserList room userid ", room.userList.uid)
+		room.userList = room.userList.next
+	}
+}
+
+func (this RegisterJson) addRoom(){
 	num := this.Roomid % ROOM_BUCKET_NUM
 	if (this.Roomid <= 0) {
 		return
@@ -177,11 +202,13 @@ func (this *RegisterJson) addRoom(){
 	node := &roomArr[num]
 	for node != nil{
 		if node.roomid == this.Roomid {
+			node.addUser(this)
 			return;	
 		}
 		if node.roomid == 0 {
 			fmt.Println("add Room node.roomid=0")
-			node.addUser(this.Uid)
+			node.roomid = this.Roomid
+			node.addUser(this)
 			return
 		}
 		if node.next == nil {
@@ -206,10 +233,13 @@ func (this *User) Register() {
 	fmt.Printf("register : %s\n",this.Content)
 	f := []byte("asas")
 	this.Conn.Write(f)
-        jsonData.addRomm() 
+        jsonData.addRoom() 
         //必须在addUser的上面 因为在addRoom里面加入uid得去user数组链表查看
         //这个user有没有包含这个房间 如果没有那么说明这个服务器上这个房间没有注册这个uid
 	jsonData.addUser(this.Conn)
+}
+func (this *User) SendMsg(){
+	
 }
 func (this *User)Test(){
 
