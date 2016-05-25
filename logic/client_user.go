@@ -52,8 +52,9 @@ type RegisterJson struct{
 
 type SendMsgJson struct{
 	Roomid int64 `json:"roomid"`
-	Msg sring `json:"msg"`
+	Msg string `json:"msg"`
 	Username string `json:"username"`
+	Uid int64 `json:"uid"`
 }
 
 const USER_BUCKET_NUM = 1024
@@ -100,11 +101,14 @@ func (user *userNode) addConn(conn net.Conn, my RegisterJson) bool{
 	if connList == nil { //初始化
 		connList = new(userConnList)
 		rList.connList = connList
+		connList.conn = conn
+		connList.time = time.Now().Unix()
+		return true
 	} 
 	for connList != nil {
-		fmt.Println("uid : ", my.Uid)
 		if connList.conn == conn {
 			//write error log
+			fmt.Println("addConn conn equal, uid=", my.Uid)
 			log.Println("[error] addConn conn equal, uid=" , my.Uid)
 			return false
 		}
@@ -113,7 +117,7 @@ func (user *userNode) addConn(conn net.Conn, my RegisterJson) bool{
 			connList = connList.next
 			connList.conn = conn
 			connList.time = time.Now().Unix()
-			fmt.Println("addConn ok")
+			fmt.Println("addConn ok uid=", my.Uid)
 			return true
 		}
 		connList = connList.next			
@@ -129,11 +133,12 @@ func (this RegisterJson) addUser(conn net.Conn){
 	node := &userArr[num]
 	for node != nil{
 		if node.uid == 0{
-			fmt.Println("addUser node.uid=0")
+			fmt.Println("addUser node.uid = 0")
 			node.addConn(conn, this)
 			return
 		}
 		if node.uid == this.Uid {
+			fmt.Println("addUser node.uid != 0")
 			node.addConn(conn, this)
 			return
 		}
@@ -164,21 +169,26 @@ func (room *roomNode) addUser(my RegisterJson) {
 	num := my.Uid % USER_BUCKET_NUM
 	user := &userArr[num]
 	//如果userNode 的roomList 有当前Roomid说明之前已经添加过当前用户的uid了
-	if !user.userIsInRoom(my.Roomid) {
-		testGetRoomUserList(room.roomid)
+	if user.userIsInRoom(my.Roomid) {
+		fmt.Println("user.userIsInRoom qqqqqqqqq")
+		if room.userList == nil {
+			fmt.Println("|||||||||||||||||||||||||")
+		}
+		//testGetRoomUserList(room.roomid)
 		return
 	}
-	fmt.Println("ewrwer3455 addUser")
 	if room.userTail == nil {
 		room.userTail = new(userList)
 		room.userList = room.userTail
                 room.userTail.uid = my.Uid
+		fmt.Println("roomNode1  addUser new uid=", room.userList.uid)
                 return
 	}
-	fmt.Println("roomNode  addUser new")
+	fmt.Println("roomNode2  addUser new uid=", my.Uid)
         newUser := new(userList)
         newUser.uid = my.Uid
         room.userTail.next = newUser
+	room.userTail = newUser //???
 	return
 }
 
@@ -190,7 +200,7 @@ func testGetRoomUserList(roomid int64) {
 	}
 	for (room.userList != nil) {
 		fmt.Println("testGetRoomUserList room userid ", room.userList.uid)
-		room.userList = room.userList.next
+		//room.userList = room.userList.next
 	}
 }
 
@@ -202,13 +212,24 @@ func (this RegisterJson) addRoom(){
 	node := &roomArr[num]
 	for node != nil{
 		if node.roomid == this.Roomid {
+			fmt.Println("add Room node.roomid != 0")
+			if node.userList == nil {
+				fmt.Println("0000000yyyyyyyyyyybbbbbbbbbbb")
+			}
 			node.addUser(this)
 			return;	
 		}
 		if node.roomid == 0 {
-			fmt.Println("add Room node.roomid=0")
+			fmt.Println("add Room node.roomid = 0")
 			node.roomid = this.Roomid
+			if node.userList == nil {
+				fmt.Println("yyyyyyyyyyybbbbbbbbbbb")
+			}
 			node.addUser(this)
+			if node.userList != nil {
+			fmt.Println("kmsastttttttttttt uid=", node.userList.uid)
+			}
+			roomArr[num].userList = node.userList
 			return
 		}
 		if node.next == nil {
@@ -222,24 +243,83 @@ func (this RegisterJson) addRoom(){
 }
 
 func (this *User) Register() {
-
-	//jsonData := make(map[string]interface{})
 	var jsonData RegisterJson
 	if json.Unmarshal([]byte(this.Content), &jsonData) != nil {
-		fmt.Println("json decode false")
+		fmt.Println("Register json decode false")
 		return
 	}
-	fmt.Println("name", jsonData.Username)	
 	fmt.Printf("register : %s\n",this.Content)
-	f := []byte("asas")
-	this.Conn.Write(f)
         jsonData.addRoom() 
         //必须在addUser的上面 因为在addRoom里面加入uid得去user数组链表查看
         //这个user有没有包含这个房间 如果没有那么说明这个服务器上这个房间没有注册这个uid
 	jsonData.addUser(this.Conn)
+	if (roomArr[jsonData.Roomid%ROOM_BUCKET_NUM].userList == nil) {
+		fmt.Println("{{{{{{{{{{{{{{{{ roomid=", jsonData.Roomid)
+	}
+}
+func getRoomUserHead(roomid int64) *userList{
+	if (roomid <= 0) {
+		return nil
+	}
+	num := roomid % ROOM_BUCKET_NUM
+	node := &roomArr[num]
+	for node != nil{
+		if node.roomid == roomid {
+			fmt.Println("getRoomUserHead , roomid:", node.roomid)
+			if (node.userList == nil) {
+				fmt.Println("88888888888888888888")
+			}
+			return node.userList
+		}
+		node = node.next
+	}
+	return nil
+}
+func getUserConnListHeadByUid(uid int64, roomid int64) *userConnList{
+	if (uid < 0) {
+		return nil
+	}
+	fmt.Println("xxzzzzzzzzzzzzzzzzzzzzz uid:", uid)
+	num := uid % USER_BUCKET_NUM
+	node := &userArr[num]
+	for node != nil {
+		if node.uid == uid {
+			break
+		}
+		node = node.next
+	}
+	if node == nil {
+		return nil
+	}
+	userRoomListNode := node.roomList
+	for userRoomListNode != nil {
+		if userRoomListNode.roomid == roomid {
+			return userRoomListNode.connList
+		}
+		userRoomListNode = userRoomListNode.next
+	}
+	return nil
 }
 func (this *User) SendMsg(){
-	
+	var jsonData SendMsgJson
+        if json.Unmarshal([]byte(this.Content), &jsonData) != nil {
+                fmt.Println("SendMsg json decode false")
+                return
+        }
+	//应该把 this.Content 发送到kafka等队列然后用另外1个服务读取队列依次向其它前端机发送
+	fmt.Println("send msg roomid : ", jsonData.Roomid)
+	userNode := getRoomUserHead(jsonData.Roomid)
+	for userNode != nil {
+		fmt.Println("bbbbmmmmm")
+		userConnListNode := getUserConnListHeadByUid(userNode.uid, jsonData.Roomid)
+		for userConnListNode != nil {
+			
+			fmt.Println("send msg, uid:", userNode.uid)
+			userConnListNode.conn.Write([]byte("send msg ok..."))
+			userConnListNode = userConnListNode.next
+		}
+		userNode = userNode.next
+	}
 }
 func (this *User)Test(){
 
