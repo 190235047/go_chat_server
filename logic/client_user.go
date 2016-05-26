@@ -275,7 +275,7 @@ func getRoomUserHead(roomid int64) *userList{
 	}
 	return nil
 }
-func getUserConnListHeadByUid(uid int64, roomid int64) *userConnList{
+func getUserRoomListByUid(uid int64, roomid int64) *roomList{
 	if (uid < 0) {
 		return nil
 	}
@@ -294,7 +294,7 @@ func getUserConnListHeadByUid(uid int64, roomid int64) *userConnList{
 	userRoomListNode := node.roomList
 	for userRoomListNode != nil {
 		if userRoomListNode.roomid == roomid {
-			return userRoomListNode.connList
+			return userRoomListNode
 		}
 		userRoomListNode = userRoomListNode.next
 	}
@@ -311,13 +311,28 @@ func (this *User) SendMsg(){
 	userNode := getRoomUserHead(jsonData.Roomid)
 	for userNode != nil {
 		fmt.Println("bbbbmmmmm")
-		userConnListNode := getUserConnListHeadByUid(userNode.uid, jsonData.Roomid)
-		for userConnListNode != nil {
-			
-			fmt.Println("send msg, uid:", userNode.uid)
-			userConnListNode.conn.Write([]byte("send msg ok..."))
-			userConnListNode = userConnListNode.next
+		userConnListNode:= getUserRoomListByUid(userNode.uid, jsonData.Roomid)
+		if userConnListNode == nil || userConnListNode.connList == nil {
+			continue
 		}
+		//借助另外一个当header头来遍历，因为header有可能被删除
+		userConnListHead := new(userConnList)
+		foreachUserConnListNode := userConnListHead;
+		foreachUserConnListNode.next = userConnListNode.connList;
+		nowTime := time.Now().Unix()
+		for foreachUserConnListNode.next != nil {
+			//心跳时间大于5分钟算过期
+			if nowTime - foreachUserConnListNode.next.time > 300 {
+				fmt.Println("close QQQQQQQQ")
+				foreachUserConnListNode.next.conn.Close()
+				foreachUserConnListNode.next = foreachUserConnListNode.next.next
+				continue
+			}
+			fmt.Println("send msg, uid:", userNode.uid)
+			foreachUserConnListNode.next.conn.Write([]byte("send msg ok..."))
+			foreachUserConnListNode = foreachUserConnListNode.next
+		}
+		userConnListNode.connList = userConnListHead.next
 		userNode = userNode.next
 	}
 }
