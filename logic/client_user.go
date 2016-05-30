@@ -7,6 +7,7 @@ import(
     "net"
     "time"
     "log"
+    "sync"
 )
 
 type User struct {
@@ -24,18 +25,21 @@ type userNode struct{
 	time int64 //当前用户connList里最新的一次数据发送
         roomList *roomList
         next *userNode
+	mutex sync.Mutex
 }
 //专门给userNode的room list
 type roomList struct {
 	roomid int64
 	connList *userConnList
 	next *roomList
+	mutex sync.Mutex
 }
 //专门给roomNode的user list
 type userList struct{
         uid int64
         uHash int16
         next *userList
+	mutex sync.Mutex
 }
 type roomNode struct{
         roomid int64
@@ -60,9 +64,10 @@ type SendMsgJson struct{
 const USER_BUCKET_NUM = 1024
 const ROOM_BUCKET_NUM = 1024
 
-var roomArr = make([]roomNode, ROOM_BUCKET_NUM)
-var userArr = make([]userNode, USER_BUCKET_NUM)
-
+//var roomArr = make([]roomNode, ROOM_BUCKET_NUM)
+var roomArr [ROOM_BUCKET_NUM]*roomNode
+//var userArr = make([]userNode, USER_BUCKET_NUM)
+var  userArr [USER_BUCKET_NUM]*userNode
 /*
 type functionRegisterType func(*msgClient.Register) bool
 
@@ -83,6 +88,8 @@ func (user *userNode) addConn(conn net.Conn, my RegisterJson) bool{
 		user.roomList.roomid = my.Roomid
 		fmt.Println("new")
 	}
+	user.roomList.mutex.Lock()
+	defer user.roomList.mutex.Unlock()
 	rList := user.roomList
 	var connList *userConnList
 	for (rList != nil) {
@@ -99,6 +106,7 @@ func (user *userNode) addConn(conn net.Conn, my RegisterJson) bool{
 		}	
 	}
 	if connList == nil { //初始化
+		fmt.Println("connList equil nil")
 		connList = new(userConnList)
 		rList.connList = connList
 		connList.conn = conn
@@ -107,6 +115,7 @@ func (user *userNode) addConn(conn net.Conn, my RegisterJson) bool{
 	} 
 	for connList != nil {
 		if connList.conn == conn {
+			connList.time = time.Now().Unix()
 			//write error log
 			fmt.Println("addConn conn equal, uid=", my.Uid)
 			log.Println("[error] addConn conn equal, uid=" , my.Uid)
@@ -130,25 +139,83 @@ func (this RegisterJson) addUser(conn net.Conn){
 	if (this.Uid == 0) {
 		return
 	}
-	node := &userArr[num]
-	for node != nil{
-		if node.uid == 0{
-			fmt.Println("addUser node.uid = 0")
-			node.addConn(conn, this)
+//	node := &userArr[num]
+//	nowTime := time.Now().Unix()
+//	for node != nil{
+//		//过期5分钟
+//		if node.time != 0 && nowTime - node.time > 300 {
+//			
+//		}
+//		if node.uid == 0{
+//			fmt.Println("addUser node.uid = 0")
+//			node.time = time.Now().Unix()
+//			node.addConn(conn, this)
+//			return
+//		}
+//		if node.uid == this.Uid {
+//			fmt.Println("addUser node.uid != 0")
+//			node.time = time.Now().Unix()
+//			node.addConn(conn, this)
+//			return
+//		}
+//		if node.next == nil {
+//			node.next = new(userNode)
+//			node = node.next
+//		} else {
+//			node = node.next
+//		}
+//	}
+	if userArr[num] == nil {
+		userArr[num] = new(userNode)
+	}
+	//借助另外的实现队列
+	userNodeHead := new(userNode)
+	userNodeList := userNodeHead
+	userNodeList.next = userArr[num]
+	nowTime := time.Now().Unix()
+	userNodeList.next.mutex.Lock()
+	defer userNodeList.next.mutex.Unlock()
+	for userNodeList.next != nil {
+		
+		//过期5分钟
+		if userNodeList.next.time != 0 && nowTime - userNodeList.next.time > 300 {
+			if userNodeList.next.next == nil {
+				userNodeList.next.next = new(userNode)
+			}
+			fmt.Println("bbBBBBBBBBBBBBBBBBBBBB uid:", userNodeList.next.uid)
+			userNodeList.next = userNodeList.next.next
+		}
+		if userNodeList.next.uid == 0{
+			fmt.Println("addUser userNodeList.uid = 0")
+			userNodeList.next.time = time.Now().Unix()
+			userNodeList.next.addConn(conn, this)
 			return
 		}
-		if node.uid == this.Uid {
-			fmt.Println("addUser node.uid != 0")
-			node.addConn(conn, this)
+		if userNodeList.next.uid == this.Uid {
+			fmt.Println("addUser userNodeList.uid != 0")
+			userNodeList.next.time = time.Now().Unix()
+			userNodeList.next.addConn(conn, this)
 			return
 		}
-		if node.next == nil {
-			node.next = new(userNode)
-			node = node.next
+		if userNodeList.next.next == nil {
+			userNodeList.next.next = new(userNode)
+			userNodeList = userNodeList.next
 		} else {
-			node = node.next
+			userNodeList = userNodeList.next
 		}
 	}
+	userArr[num] = userNodeHead.next
+
+
+
+
+
+
+
+
+
+
+
 }
 
 //判断userNode 里面room id 是否在里面
@@ -167,10 +234,10 @@ func (user *userNode) userIsInRoom(roomid int64) bool {
 
 func (room *roomNode) addUser(my RegisterJson) {
 	num := my.Uid % USER_BUCKET_NUM
-	user := &userArr[num]
+	user := userArr[num]
 	//如果userNode 的roomList 有当前Roomid说明之前已经添加过当前用户的uid了
-	if user.userIsInRoom(my.Roomid) {
-		fmt.Println("user.userIsInRoom qqqqqqqqq")
+	if user != nil && user.userIsInRoom(my.Roomid) {
+		fmt.Println("user is nil or user.userIsInRoom qqqqqqqqq")
 		if room.userList == nil {
 			fmt.Println("|||||||||||||||||||||||||")
 		}
@@ -194,7 +261,7 @@ func (room *roomNode) addUser(my RegisterJson) {
 
 func testGetRoomUserList(roomid int64) {
 	num  := roomid % ROOM_BUCKET_NUM
-	room := &roomArr[num]
+	room := roomArr[num]
 	if (room == nil) {
 		fmt.Println("no user list, roomid=", roomid)
 	}
@@ -209,7 +276,10 @@ func (this RegisterJson) addRoom(){
 	if (this.Roomid <= 0) {
 		return
 	}
-	node := &roomArr[num]
+	if roomArr[num] == nil {
+		roomArr[num] = new(roomNode)
+	}
+	node := roomArr[num]
 	for node != nil{
 		if node.roomid == this.Roomid {
 			fmt.Println("add Room node.roomid != 0")
@@ -257,19 +327,19 @@ func (this *User) Register() {
 		fmt.Println("{{{{{{{{{{{{{{{{ roomid=", jsonData.Roomid)
 	}
 }
-func getRoomUserHead(roomid int64) *userList{
+func getRoomPtr(roomid int64) *roomNode{
 	if (roomid <= 0) {
 		return nil
 	}
 	num := roomid % ROOM_BUCKET_NUM
-	node := &roomArr[num]
+	node := roomArr[num]
 	for node != nil{
 		if node.roomid == roomid {
 			fmt.Println("getRoomUserHead , roomid:", node.roomid)
 			if (node.userList == nil) {
 				fmt.Println("88888888888888888888")
 			}
-			return node.userList
+			return node
 		}
 		node = node.next
 	}
@@ -281,7 +351,7 @@ func getUserRoomListByUid(uid int64, roomid int64) *roomList{
 	}
 	fmt.Println("xxzzzzzzzzzzzzzzzzzzzzz uid:", uid)
 	num := uid % USER_BUCKET_NUM
-	node := &userArr[num]
+	node := userArr[num]
 	for node != nil {
 		if node.uid == uid {
 			break
@@ -308,13 +378,33 @@ func (this *User) SendMsg(){
         }
 	//应该把 this.Content 发送到kafka等队列然后用另外1个服务读取队列依次向其它前端机发送
 	fmt.Println("send msg roomid : ", jsonData.Roomid)
-	userNode := getRoomUserHead(jsonData.Roomid)
-	for userNode != nil {
+	roomNodePtr := getRoomPtr(jsonData.Roomid)
+	if roomNodePtr == nil || roomNodePtr.userList == nil {
+		return
+	}
+	userListNode := roomNodePtr.userList
+	if userListNode == nil{
+		return
+	}
+	userListNode.mutex.Lock()
+	defer userListNode.mutex.Unlock()
+	userListHead := new(userList)
+	userListForeach := userListHead
+	userListForeach.next = roomNodePtr.userList
+	for userListForeach.next != nil {
 		fmt.Println("bbbbmmmmm")
-		userConnListNode:= getUserRoomListByUid(userNode.uid, jsonData.Roomid)
+		userConnListNode:= getUserRoomListByUid(userListForeach.next.uid, jsonData.Roomid)
 		if userConnListNode == nil || userConnListNode.connList == nil {
+			if userListForeach.next.next == nil {
+				//说明是tail
+				roomNodePtr.userTail = userListForeach.next
+			}
+			userListForeach.next = userListForeach.next.next
+			fmt.Println("kill kill kill")
 			continue
 		}
+		userConnListNode.mutex.Lock()
+		defer userConnListNode.mutex.Unlock()
 		//借助另外一个当header头来遍历，因为header有可能被删除
 		userConnListHead := new(userConnList)
 		foreachUserConnListNode := userConnListHead;
@@ -328,13 +418,14 @@ func (this *User) SendMsg(){
 				foreachUserConnListNode.next = foreachUserConnListNode.next.next
 				continue
 			}
-			fmt.Println("send msg, uid:", userNode.uid)
+			fmt.Println("send msg, uid:", userListForeach.next.uid)
 			foreachUserConnListNode.next.conn.Write([]byte("send msg ok..."))
 			foreachUserConnListNode = foreachUserConnListNode.next
 		}
 		userConnListNode.connList = userConnListHead.next
-		userNode = userNode.next
+		userListForeach = userListForeach.next
 	}
+	roomNodePtr.
 }
 func (this *User)Test(){
 
