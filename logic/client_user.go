@@ -184,6 +184,7 @@ func (this RegisterJson) addUser(conn net.Conn){
 			}
 			fmt.Println("bbBBBBBBBBBBBBBBBBBBBB uid:", userNodeList.next.uid)
 			userNodeList.next = userNodeList.next.next
+			continue
 		}
 		if userNodeList.next.uid == 0{
 			fmt.Println("addUser userNodeList.uid = 0")
@@ -382,12 +383,8 @@ func (this *User) SendMsg(){
 	if roomNodePtr == nil || roomNodePtr.userList == nil {
 		return
 	}
-	userListNode := roomNodePtr.userList
-	if userListNode == nil{
-		return
-	}
-	userListNode.mutex.Lock()
-	defer userListNode.mutex.Unlock()
+	roomNodePtr.userList.mutex.Lock()
+	defer roomNodePtr.userList.mutex.Unlock()
 	userListHead := new(userList)
 	userListForeach := userListHead
 	userListForeach.next = roomNodePtr.userList
@@ -395,12 +392,16 @@ func (this *User) SendMsg(){
 		fmt.Println("bbbbmmmmm")
 		userConnListNode:= getUserRoomListByUid(userListForeach.next.uid, jsonData.Roomid)
 		if userConnListNode == nil || userConnListNode.connList == nil {
+			fmt.Println("kill kill kill uid:", userListForeach.next.uid)
 			if userListForeach.next.next == nil {
 				//说明是tail
-				roomNodePtr.userTail = userListForeach.next
+				if userListForeach.next == roomNodePtr.userList {
+					roomNodePtr.userTail = nil
+				} else {
+					roomNodePtr.userTail = userListForeach.next
+				}
 			}
 			userListForeach.next = userListForeach.next.next
-			fmt.Println("kill kill kill")
 			continue
 		}
 		userConnListNode.mutex.Lock()
@@ -413,7 +414,7 @@ func (this *User) SendMsg(){
 		for foreachUserConnListNode.next != nil {
 			//心跳时间大于5分钟算过期
 			if nowTime - foreachUserConnListNode.next.time > 300 {
-				fmt.Println("close QQQQQQQQ")
+				fmt.Println("close QQQQQQQQ uid:", userListForeach.next.uid)
 				foreachUserConnListNode.next.conn.Close()
 				foreachUserConnListNode.next = foreachUserConnListNode.next.next
 				continue
@@ -425,7 +426,7 @@ func (this *User) SendMsg(){
 		userConnListNode.connList = userConnListHead.next
 		userListForeach = userListForeach.next
 	}
-	roomNodePtr.
+	roomNodePtr.userList = userListHead.next
 }
 func (this *User)Test(){
 
