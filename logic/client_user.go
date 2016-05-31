@@ -139,32 +139,6 @@ func (this RegisterJson) addUser(conn net.Conn){
 	if (this.Uid == 0) {
 		return
 	}
-//	node := &userArr[num]
-//	nowTime := time.Now().Unix()
-//	for node != nil{
-//		//过期5分钟
-//		if node.time != 0 && nowTime - node.time > 300 {
-//			
-//		}
-//		if node.uid == 0{
-//			fmt.Println("addUser node.uid = 0")
-//			node.time = time.Now().Unix()
-//			node.addConn(conn, this)
-//			return
-//		}
-//		if node.uid == this.Uid {
-//			fmt.Println("addUser node.uid != 0")
-//			node.time = time.Now().Unix()
-//			node.addConn(conn, this)
-//			return
-//		}
-//		if node.next == nil {
-//			node.next = new(userNode)
-//			node = node.next
-//		} else {
-//			node = node.next
-//		}
-//	}
 	if userArr[num] == nil {
 		userArr[num] = new(userNode)
 	}
@@ -190,13 +164,13 @@ func (this RegisterJson) addUser(conn net.Conn){
 			fmt.Println("addUser userNodeList.uid = 0")
 			userNodeList.next.time = time.Now().Unix()
 			userNodeList.next.addConn(conn, this)
-			return
+			break
 		}
 		if userNodeList.next.uid == this.Uid {
 			fmt.Println("addUser userNodeList.uid != 0")
 			userNodeList.next.time = time.Now().Unix()
 			userNodeList.next.addConn(conn, this)
-			return
+			break
 		}
 		if userNodeList.next.next == nil {
 			userNodeList.next.next = new(userNode)
@@ -206,29 +180,23 @@ func (this RegisterJson) addUser(conn net.Conn){
 		}
 	}
 	userArr[num] = userNodeHead.next
-
-
-
-
-
-
-
-
-
-
-
 }
 
 //判断userNode 里面room id 是否在里面
-func (user *userNode) userIsInRoom(roomid int64) bool {
-	roomList := user.roomList
-	for roomList != nil {
-		if roomList.roomid == roomid {
-			fmt.Println("kkkkkkkkkkkkkk  roomid=", roomList.roomid)
-			return true
+func (user *userNode) userIsInRoom(uid int64, roomid int64) bool {
+	for user != nil {
+		if user.uid == uid {
+			roomList := user.roomList
+			for roomList != nil {
+				if roomList.roomid == roomid {
+					fmt.Println("kkkkkkkkkkkkkk  roomid=", roomList.roomid)
+					return true
+				}
+				fmt.Println("bbbbbbbbbbb  roomid=", roomList.roomid)
+				roomList = roomList.next
+			}
 		}
-		fmt.Println("bbbbbbbbbbb  roomid=", roomList.roomid)
-		roomList = roomList.next
+		user = user.next
 	}
 	return false
 }
@@ -237,7 +205,7 @@ func (room *roomNode) addUser(my RegisterJson) {
 	num := my.Uid % USER_BUCKET_NUM
 	user := userArr[num]
 	//如果userNode 的roomList 有当前Roomid说明之前已经添加过当前用户的uid了
-	if user != nil && user.userIsInRoom(my.Roomid) {
+	if user != nil && user.userIsInRoom(my.Uid, my.Roomid) {
 		fmt.Println("user is nil or user.userIsInRoom qqqqqqqqq")
 		if room.userList == nil {
 			fmt.Println("|||||||||||||||||||||||||")
@@ -396,8 +364,10 @@ func (this *User) SendMsg(){
 			if userListForeach.next.next == nil {
 				//说明是tail
 				if userListForeach.next == roomNodePtr.userList {
+					fmt.Println("userConnListNode == nil || userConnListNode.connList == nil, tail = nil")
 					roomNodePtr.userTail = nil
 				} else {
+					//fmt.Println("userConnListNode == nil || userConnListNode.connList == nil, uid = ", userListForeach.next.next.uid)
 					roomNodePtr.userTail = userListForeach.next
 				}
 			}
