@@ -53,8 +53,9 @@ func handleConn(conn net.Conn){
             if (!newData.GetIsKeep() || !flag) {
                 break
             }
-    }   
-
+    }
+	fmt.Println("hahha main close hahah")
+    conn.Close()	
 }
 
 func main() {

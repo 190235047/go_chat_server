@@ -133,7 +133,21 @@ func (user *userNode) addConn(conn net.Conn, my RegisterJson) bool{
 	}
 	return false
 }
-
+func (this *userNode) closeConn(){
+	if this == nil {
+		return
+	}
+	fmt.Println("delete many...")
+	roomList := this.roomList
+	for roomList != nil {
+		userConnList := roomList.connList
+		for userConnList != nil {
+			userConnList.conn.Close()
+			userConnList = userConnList.next
+		}
+		roomList = roomList.next
+	}
+}
 func (this RegisterJson) addUser(conn net.Conn){
 	num := this.Uid % USER_BUCKET_NUM
 	if (this.Uid == 0) {
@@ -157,6 +171,7 @@ func (this RegisterJson) addUser(conn net.Conn){
 				userNodeList.next.next = new(userNode)
 			}
 			fmt.Println("bbBBBBBBBBBBBBBBBBBBBB uid:", userNodeList.next.uid)
+			userNodeList.next.closeConn()
 			userNodeList.next = userNodeList.next.next
 			continue
 		}
@@ -371,6 +386,7 @@ func (this *User) SendMsg(){
 					roomNodePtr.userTail = userListForeach.next
 				}
 			}
+			//删除这个房间这个人的uid
 			userListForeach.next = userListForeach.next.next
 			continue
 		}
